@@ -46,26 +46,30 @@ class PostController extends Controller
      */
     public function store(Request $request)
     {
-        //validazione
-        $request->validate([
+         // validazione
+         $request->validate([
             'title' => 'required|string|max:255',
             'content' => 'required|string|max:65535',
             'published' => 'sometimes|accepted',
-            'category_id' => 'nullable|exists:categories,id'
+            'category_id' => 'nullable|exists:categories,id',
+            'tags' => 'nullable|exists:tags,id',
         ]);
-        // prendiamo i dati dalla request e creo post
+        // prendo i dati dalla request e creo il post
         $data = $request->all();
         $newPost = new Post();
         $newPost->fill($data);
 
         $newPost->slug = $this->getSlug($data['title']);
 
-        $newPost->published = isset($data['published']);
+        $newPost->published = isset($data['published']); // true o false
         $newPost->save();
 
+        // se ci sono dei tags associati, li associo al post appena creato
+        if(isset($data['tags'])) {
+            $newPost->tags()->sync($data['tags']);
+        }
+        // redirect alla pagina del post appena creato
         return redirect()->route('admin.posts.show', $newPost->id);
-
-        // redirect alla pagina appena creata
     }
 
     /**
@@ -88,8 +92,13 @@ class PostController extends Controller
     public function edit(Post $post)
     {
         $categories = Category::all();
+        $tags = Tag::all();
 
-        return view('admin.posts.edit', compact('post', 'categories'));
+        $postTags = $post->tags->map(function ($item) {
+            return $item->id;
+        })->toArray();
+
+        return view('admin.posts.edit', compact('post', 'categories', 'tags', 'postTags'));
     }
 
     /**
@@ -119,6 +128,10 @@ class PostController extends Controller
         $post->published = isset($data['published']); // true o false
 
         $post->save();
+
+        $tags = isset($data['tags']) ? $data['tags'] : [];
+
+        $post->tags()->sync($tags);
         // redirect
         return redirect()->route('admin.posts.show', $post->id);
     }
